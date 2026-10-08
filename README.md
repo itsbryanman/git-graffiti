@@ -1,5 +1,17 @@
 # git-graffiti
 
+<p align="center">
+  <img src="assets/header.svg" alt="git-graffiti, your commit graph needed worse ideas" width="100%">
+</p>
+
+<p align="center">
+  <a href="https://www.rust-lang.org/"><img alt="Rust 2024" src="https://img.shields.io/badge/Rust-2024-111111?style=flat-square&amp;logo=rust&amp;logoColor=white"></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-7ee787?style=flat-square"></a>
+  <img alt="SHA-1 repositories" src="https://img.shields.io/badge/git-SHA--1_only-ff4d8d?style=flat-square&amp;logo=git&amp;logoColor=white">
+  <img alt="OpenCL is optional" src="https://img.shields.io/badge/OpenCL-optional-586069?style=flat-square">
+  <a href="https://github.com/itsbryanman/git-graffiti/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/itsbryanman/git-graffiti?style=flat-square&amp;color=ffbd2e"></a>
+</p>
+
 Spray paint your git history.
 
 ```
@@ -35,23 +47,31 @@ Then it counts. Try nonce 0, hash, check the prefix. Try nonce 1. Keep going unt
 
 Two tricks make that fast:
 
-- **Midstate caching.** Everything before the nonce is identical on every attempt, so the SHA-1 state for those blocks is computed once. The message is padded so the nonce always lands in the final 64-byte block, which means each attempt is a single block compression instead of rehashing the whole commit.
-- **Raw byte compare.** Prefixes are checked as masked bytes, not hex strings. Odd-length prefixes use a nibble mask.
+- Midstate caching: Everything before the nonce is identical on every attempt, so the SHA-1 state for those blocks is computed once. I pad the message so the 64-byte nonce is one aligned block. Each attempt compresses that block and the fixed SHA-1 padding block. A 64-byte nonce plus SHA-1's padding cannot fit in one block. Math remains rude.
+- Raw byte compare: Prefixes are checked as masked bytes, not hex strings. Odd-length prefixes use a nibble mask.
 
 Rewriting history is the annoying part. Every commit's hash depends on its parent's hash, so you can't mine them in parallel. git-graffiti walks oldest to newest, rewrites each commit's `parent` line to point at the freshly mined parent, then mines that commit. Parallelism happens inside each commit's search, across every core (or the GPU).
+
+```
+before:  6b4248b <- 3321f83 <- cb1b2bb <- 47a903c
+                     spray babe cafe beef dead
+after:   babe... <- cafe... <- beef... <- dead...
+```
+
+The trees and visible messages stay put. The judgment does not.
 
 ## How hard is it
 
 Each hex char is 4 bits, so every extra char is 16x the work. Expected attempts for a prefix of length n is 16^n.
 
-| prefix | bits | expected attempts | CPU (8 threads) | GPU |
+| prefix | bits | expected attempts | CPU (12 threads) | GPU |
 |---|---|---|---|---|
-| 5 | 20 | ~1M | <!-- bench --> | <!-- bench --> |
-| 6 | 24 | ~16.7M | <!-- bench --> | <!-- bench --> |
-| 7 | 28 | ~268M | <!-- bench --> | <!-- bench --> |
+| 5 | 20 | ~1M | 49 ms | <!-- bench --> |
+| 6 | 24 | ~16.7M | 781 ms | <!-- bench --> |
+| 7 | 28 | ~268M | 12.5 s | <!-- bench --> |
 | 8 | 32 | ~4.3B | <!-- bench --> | <!-- bench --> |
 
-Numbers come from `cargo bench` on my machine. Yours will be different. 7 chars is the sweet spot because that's what `--oneline` and GitHub show.
+`cargo bench` measured 21.5 million attempts per second on an Intel Core i5-12500 using 12 threads. The times are expected attempts divided by that measured rate. I had no OpenCL GPU here, so the GPU cells stay blank. Yours will be different. 7 chars is the sweet spot because that's what `--oneline` and GitHub show.
 
 ## Install
 
