@@ -126,7 +126,7 @@ git graffiti undo
 
 **It always makes a backup.** Before anything gets rewritten, the old HEAD is saved to `refs/graffiti/backup/<unix-time>`. That's what `undo` restores. `git fsck` passes on everything git-graffiti writes, and the test suite checks it.
 
-## Prior art
+## I found this and then made this
 
 [lucky-commit](https://github.com/not-an-aardvark/lucky-commit) by not-an-aardvark did single-commit prefix mining first and does it well. Go look at it. git-graffiti is about the whole column: planning a message across a history and rewriting it in one shot.
 
